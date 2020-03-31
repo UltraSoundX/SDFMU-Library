@@ -14,18 +14,11 @@ class LibraryRestHandler extends SimpleRest {
  
     public function login($username,$password) {  
     	$conn = new mysqli($this->server, $this->dbuser, $this->dbpass, $this->dbname);
-		if (mysqli_connect_errno($con)) {
-		    $statusCode = 500;//Internal server error
-		    $this ->setHttpHeaders($statusCode);
-		}
         $stmt = $conn->prepare("SELECT * FROM user WHERE studentid =? AND password=?");
         $stmt ->bind_param("ss", $username, $password);
         $stmt->execute();
         $stmt->store_result();
         if ($stmt->num_rows) {
-            $statusCode = 200;//OK
-            //$requestContentType = $_SERVER['HTTP_ACCEPT'];
-            //$this ->setHttpHeaders($requestContentType, $statusCode);
             $rawData = array ('msg'=>'Login');
             $response = $this->encodeJson($rawData);
             echo $response;
@@ -33,9 +26,6 @@ class LibraryRestHandler extends SimpleRest {
         	$rawData = array ('msg'=>'UserError');
             $response = $this->encodeJson($rawData);
             echo $response;
-            //$statusCode = 401;//Unauthorized
-            //$requestContentType = $_SERVER['HTTP_ACCEPT'];
-            //$this ->setHttpHeaders($requestContentType, $statusCode);
         }
     }
     
@@ -204,23 +194,29 @@ class LibraryRestHandler extends SimpleRest {
         curl_setopt($session, CURLOPT_RETURNTRANSFER, 1);
         $output = json_decode(curl_exec($session),true);
         $output = $output['data']['list'];
-        foreach ($output as $list ) {
-            $seat = $list['id'];
-            $status = $list['status_name'];
-            if ($status == '空闲'){
-                $Subcribe = $appoint -> Subscirbe($username,$area,$seat);
-                if($Subcribe){
-                    $msg = array('area'=>$area, 'seat'=>$seat);
-                    $response = $this -> encodeJson($msg);
-                    echo $response;
-                    exit ;
-                } else {
-                    $msg = array('msg'=>'Error');
-                    $response = $this -> encodeJson($msg);
-                    echo $response;
-                    exit ;
+       if(is_array($output)) {
+            foreach ($output as $list ) {
+                $seat = $list['id'];
+                $status = $list['status_name'];
+                if ($status == '空闲'){
+                    $Subcribe = $appoint -> Subscirbe($username,$area,$seat);
+                    if($Subcribe){
+                        $msg = array('area'=>$area, 'seat'=>$seat);
+                        $response = $this -> encodeJson($msg);
+                        echo $response;
+                        exit ;
+                    } else {
+                        $msg = array('msg'=>'Error');
+                        $response = $this -> encodeJson($msg);
+                        echo $response;
+                        exit ;
+                    }
                 }
             }
+        } else {
+            $msg = array('msg'=>'Error');
+            $response = $this -> encodeJson($msg);
+            echo $response;
         }
     }
 }
