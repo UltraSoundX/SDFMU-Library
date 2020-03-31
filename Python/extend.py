@@ -1,6 +1,8 @@
 import pymysql
 import string
 import random
+import time
+import hashlib
 import requests
 
 数据库 = pymysql.connect("localhost","Radiology-Library","Radiology-Library","Library")
@@ -14,6 +16,62 @@ def 邀请码生成(位数):
             key += '-'
     print(key)
     return key
+
+class 抢座:
+    日期 = time.strftime('%Y-%m-%d',time.localtime())
+
+    def 获取预约信息(self,书库):
+        url = "http://202.194.232.138:85/api.php/space_time_buckets/?area="+str(书库)+"&day="+str('2020-04-01')
+        请求 = requests.get(url).json()
+        if 请求['status'] :
+            返回值 = []
+            返回值.append(请求['data']['list'][0]['bookTimeId'])
+            返回值.append(请求['data']['list'][0]['startTime'])
+            return 返回值
+        else :
+            return 0
+    
+    def 获取Token(self,用户名):
+        密码 = hashlib.md5()
+        密码.update(str(用户名).encode("utf-8"))
+        密码 = 密码.hexdigest()
+        url = "http://202.194.232.138:85/api.php/login?from=mobile&password="+str(密码)+"&username=" +str(用户名)
+        请求 = requests.get(url).json()
+        return 请求['data']['_hash_']['access_token']
+    
+    def 订阅(self,用户名,书库,座位):
+        Token = self.获取Token(用户名)
+        预约代码 = self.获取预约信息(书库)[0]
+        载荷 = {'access_token': Token, 'userid': 用户名, 'type': '1', 'id': 座位, 'segment': 预约代码}
+        url = "http://202.194.232.138:85/api.php/spaces/"+str(座位)+"/book"
+        请求 = requests.post(url, data=载荷).json()
+        #print (请求)
+        return 请求['status']
+
+
+
+    def 抢座(self,用户名,书库):
+        if self.获取预约信息(书库) == 0:
+            return 0
+        else:
+            返回值 = self.获取预约信息(书库)
+            预约代码 = 返回值[0]
+            开始时间 = 返回值[1]
+            url = "http://202.194.232.138:85/api.php/spaces_old/?area="+str(书库)+"&segment="+str(预约代码)+"&day="+str(self.日期)+"&startTime="+str(开始时间)+"&endTime=21:20" 
+            请求 = requests.get(url).json()
+            总位置 = 请求['data']['list']
+            if isinstance(总位置,list):
+                for 位置 in 总位置:
+                    编号 = 位置['id']
+                    状态 = 位置['status_name']
+                    if 状态 == '空闲':
+                        if self.订阅(用户名,书库,编号):
+                            return 1
+                        else:
+                            return 0
+            else:
+                return 0
+
 
 class function:
 
@@ -81,5 +139,5 @@ class function:
         return 1
 
     def 抢座(self,书库,用户名):
-        url = 'https://api.radiology.link/Library/RestController.php/?do=now&username=%s&area=%s'%(用户名,书库)
-        requests.get(url)
+        信标 = 抢座()
+        return 信标.抢座(用户名,书库)
