@@ -1,11 +1,18 @@
-import pymysql
-import string
-import random
-import time
-import hashlib
-import requests
+import pymysql,string,random,time,hashlib,requests
+from io import BytesIO
+from requests.cookies import RequestsCookieJar
+from urllib.parse import quote
 
-数据库 = pymysql.connect("localhost","Radiology-Library","Radiology-Library","Library")
+try:
+    数据库 = pymysql.connect("localhost","Radiology-Library","Radiology-Library","Library")
+    print('\033[32mAPI:Ready')
+    print('\033[0m')
+except:
+    print('\033[31m数据库连接失败')
+    print('\033[33mWeb API:Down')
+    print('\033[32m验证接口：Ready')
+    print('\033[0m')
+
 
 def 邀请码生成(位数):
     total = string.digits +string.ascii_letters
@@ -14,8 +21,36 @@ def 邀请码生成(位数):
         key += random.choice(total) #获取随机字符或数字
         if i % 4 == 0 and i !=位数: #每隔4个字符增加'-'
             key += '-'
-    print(key)
     return key
+
+class verify:
+
+    def 获取Cookie(self):
+        url = "http://jwc.sdfmu.edu.cn/academic/common/security/login.jsp"
+        Cookie = requests.utils.dict_from_cookiejar(requests.get(url).cookies)
+        return Cookie
+    
+    def 验证码(self):
+        Cookie = self.获取Cookie()
+        url = 'http://jwc.sdfmu.edu.cn/academic/getCaptcha.do'
+        验证码二进制 = requests.get(url,cookies=Cookie).content
+        文件名 = "/Users/haroldxin/Desktop/Code/temp/"+str(hashlib.md5(验证码二进制).hexdigest())+".jpg"
+        with open(文件名, "wb") as f:
+            f.write(验证码二进制)
+            f.close()
+        文件名 = str(hashlib.md5(验证码二进制).hexdigest())+".jpg"
+        return Cookie,文件名
+    
+    def 登录(self,Cookie,用户名,密码,验证码):
+        header = {"content-type":"application/x-www-form-urlencoded"}
+        载荷 = "j_username="+str(用户名)+"&j_password="+quote(str(密码))+"&j_captcha="+str(验证码)
+        url = "http://jwc.sdfmu.edu.cn/academic/j_acegi_security_check"
+        请求 = requests.post(url,data=载荷,headers=header,cookies=Cookie)
+        if 请求.url == 'http://jwc.sdfmu.edu.cn/academic/index_new.jsp':
+            return 1
+        else:
+            return 0
+    
 
 class 抢座:
     日期 = time.strftime('%Y-%m-%d',time.localtime())
@@ -48,8 +83,6 @@ class 抢座:
         #print (请求)
         return 请求['status']
 
-
-
     def 抢座(self,用户名,书库):
         if self.获取预约信息(书库) == 0:
             return 0
@@ -66,12 +99,11 @@ class 抢座:
                     状态 = 位置['status_name']
                     if 状态 == '空闲':
                         if self.订阅(用户名,书库,编号):
-                            return 1
+                            return 书库,编号
                         else:
-                            return 0
+                            return 0,0
             else:
-                return 0
-
+                return 0,0
 
 class function:
 
@@ -138,6 +170,6 @@ class function:
         游标.execute(更新QQ)
         return 1
 
-    def 抢座(self,书库,用户名):
+    def 抢座(self,用户名,书库):
         信标 = 抢座()
         return 信标.抢座(用户名,书库)
