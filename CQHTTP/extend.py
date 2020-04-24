@@ -17,6 +17,19 @@ except:
 
 class Verify:
 
+    def 校验(self,id,QQ):
+        密码 = hashlib.md5()
+        密码.update(str(id).encode("utf-8"))
+        密码 = 密码.hexdigest()
+        url = "http://202.194.232.138:85/api.php/login?from=mobile&password="+str(密码)+"&username=" +str(id)
+        请求 = requests.get(url).json()
+        if 请求['status'] == 0:
+            self.sendmsg(QQ,'请联系 图书馆 进行预约系统的密码重置 \n重置为您的学号')
+            return 0
+        else :
+            self.sendmsg(QQ,'恭喜您，无需修改图书馆登录密码')
+            return 0
+
     def sendmsg(self,QQ,msg):
         url = "http://lab.radiology.link:5700/send_private_msg?user_id="+str(QQ)+"&message="+str(msg)
         requests.get(url)
@@ -27,6 +40,46 @@ class Verify:
         Cookie = requests.utils.dict_from_cookiejar(requests.get(url).cookies)
         return Cookie
     
+    def 注册(self,学号,密码,验证码,QQ):
+        游标 = 数据库.cursor()
+        获取Cookie = "SELECT `cookie` FROM `verify` WHERE `verify`='%s'" % (QQ)
+        游标.execute(获取Cookie)
+        Cookie = 游标.fetchone()[0]
+        Cookie = eval(Cookie)
+        header = {"content-type":"application/x-www-form-urlencoded"}
+        载荷 = "j_username="+str(学号)+"&j_password="+quote(str(密码))+"&j_captcha="+str(验证码)
+        url = "http://jwc.sdfmu.edu.cn/academic/j_acegi_security_check"
+        请求 = requests.post(url,data=载荷,headers=header,cookies=Cookie)
+        if 请求.url == 'http://jwc.sdfmu.edu.cn/academic/index_new.jsp':
+            注册 = "INSERT INTO `user`(`studentid`, `password`,`qq`) VALUES ('%s','%s','%s')" % (学号,学号,QQ)
+            print (注册)
+            try:
+                if 游标.execute(注册):
+                    self.sendmsg(QQ,'注册成功\n网页端:https://lab.radiology.link\n默认登录密码为学号')
+            except:
+                self.sendmsg(QQ,'发生了错误，是不是注册过了')
+        else:
+            self.sendmsg(QQ,'发生了错误，请重新发送 注册 ')
+            return 0
+
+    def 注册验证码(self,QQ):
+        Cookie = self.获取Cookie()
+        游标 = 数据库.cursor()
+        注册Cookie = 'INSERT INTO `verify`(`verify`, `cookie`) VALUES ("%s","%s")' % (QQ,str(Cookie))
+        try:
+            游标.execute(注册Cookie)
+        except:
+            更新Cookie = 'UPDATE `verify` SET `cookie`="%s" WHERE `verify`="%s"' % (Cookie,QQ)
+            游标.execute(更新Cookie)
+        url = 'http://jwc.sdfmu.edu.cn/academic/getCaptcha.do'
+        验证码二进制 = requests.get(url,cookies=Cookie).content
+        文件名 = "/www/wwwroot/api/Library/img/"+str(hashlib.md5(验证码二进制).hexdigest())+".jpg"
+        with open(文件名, "wb") as f:
+            f.write(验证码二进制)
+            f.close()
+        文件名 = str(hashlib.md5(验证码二进制).hexdigest())+".jpg"
+        return 文件名
+
     def 验证码(self,QQ):
         Cookie = self.获取Cookie()
         游标 = 数据库.cursor()
@@ -107,6 +160,8 @@ class Appoint :
             area = 总书库[random.randint(0,7)]
             url = "https://api.radiology.link/Library/RestController.php/?do=now&username="+str(id)+"&area="+str(area)
             recv = requests.get(url).json()
+            print (url)
+            print (recv)
             if 'msg' in recv :
                 self.sendmsg(QQ,'预约失败，是否已有预约或者重试一次')
             if len(recv) == 2 :
@@ -215,5 +270,6 @@ class Appoint :
                 else:
                     msg = '预约失败，请重试一次预约指令或登录网页端进行预约 https://lab.radiology.link'
                     self.sendmsg(QQ,msg)
-            
-            return 0
+        else:
+            self.sendmsg(QQ,'请前往\nhttps://lab.radiology.link/signup.html 进行注册 或 \n回复 注册（试运行）')
+        return 0
