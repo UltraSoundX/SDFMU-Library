@@ -5,9 +5,15 @@
 Demo:https://lab.radiology.link
 
 文件夹：
-WEB -- 包含前端JS | API-对应sql数据处理以及coolq机器人对接 |Appoint - 对应计划任务执行预约
+WEB -- 包含前端JS
 
-新增：Python--对应PHP相应后端操作 只是想试试Flask毕竟Python是信仰！万不得已还是不会用这个做后端的
+API-对应sql数据处理以及coolq机器人对接
+
+Appoint - 对应计划任务执行预约
+
+CQHTTP - 用Flask处理CQHTTP消息上报
+
+新增：CQHTTP 消息上报处理
 
 THEOL | 优慕课教务系统身份认证：/API/Verify.php
 Demo:https://lab.radiology.link/bind.html
