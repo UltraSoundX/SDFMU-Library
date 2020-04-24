@@ -33,125 +33,137 @@ def sendmsg(userid):
 
 @app.route('/', methods=['POST'])
 def receive():
-    recv = json.loads(request.data.decode('utf-8'))
-    msgtype = recv['post_type']
-    userid = recv['user_id']
-    print (msgtype)
-    if msgtype == 'message': 
-        msg = recv['message']
-        raw = recv['raw_message']
-        print(raw)
-        if '人工' in msg:
-            url = "http://api.radiology.link:5700/send_private_msg"
-            message = "有问题请联系：[CQ:contact,id=951671556,type=qq]"
-            payload = {"user_id":userid,"message":message}
-            requests.post(url,data=payload)
-            return 'Success'
-
-        if '注册' in msg:
-            if ',' in msg or '，' in msg:
-                msg = msg.replace(" ","")
-                msg = msg.replace("，",",")[2:]
-                msg = re.split(',',msg)
-                学号 = msg[0]
-                密码 = msg[1]
-                验证码 = msg[2]
-                #邀请码 = msg[3]
-                认证.注册(学号,密码,验证码,userid)
-                return ('Success')
-            else:
-                认证.sendmsg(userid,"正在从 教育在线 获取验证码...\n注意！该功能仅为试验功能 开放时间不定")
+    try:
+        recv = json.loads(request.data.decode('utf-8'))
+        msgtype = recv['post_type']
+        userid = recv['user_id']
+        print (msgtype)
+        if msgtype == 'message': 
+            msg = recv['message']
+            raw = recv['raw_message']
+            print(raw)
+            if '人工' in msg:
                 url = "http://api.radiology.link:5700/send_private_msg"
-                jpg = "https://api.radiology.link/Library/img/"+str(认证.注册验证码(userid))
-                message = "验证码：[CQ:image,file=" + str(jpg) +"]\n请回复 注册 教育在线学号,教育在线密码,验证码 用逗号分隔,看不清请重新回复注册"
+                message = "有问题请联系：[CQ:contact,id=951671556,type=qq]"
                 payload = {"user_id":userid,"message":message}
                 requests.post(url,data=payload)
                 return 'Success'
-        if '登录' in msg or '登陆' in msg:
-            if " " in msg:
-                msg = msg.replace(" ","")
-                id = msg[2:]
-                认证.校验(id,userid)
-                return "Success"
-            else :
+            
+            if '邀请码' in msg:
+                认证.sendmsg(userid,'获取您的邀请码需已经绑定QQ')
+                认证.邀请码(userid)
+                return 'Success'
+
+            if '注册' in msg:
+                if ',' in msg or '，' in msg:
+                    msg = msg.replace(" ","")
+                    msg = msg.replace("，",",")[2:]
+                    msg = re.split(',',msg)
+                    学号 = msg[0]
+                    密码 = msg[1]
+                    验证码 = msg[2]
+                    邀请码 = msg[3]
+                    认证.注册(学号,密码,验证码,邀请码,userid)
+                    return ('Success')
+                else:
+                    认证.sendmsg(userid,"正在从 教育在线 获取验证码...\n该功能仅为试验功能 开放时间不定")
+                    url = "http://api.radiology.link:5700/send_private_msg"
+                    jpg = "https://api.radiology.link/Library/img/"+str(认证.注册验证码(userid))
+                    message = "验证码：[CQ:image,file=" + str(jpg) +"]\n请回复\n注册 教育在线学号,教育在线密码,验证码,邀请码 用逗号分隔,看不清请重新回复注册\n需要邀请码请回复 人工"
+                    payload = {"user_id":userid,"message":message}
+                    requests.post(url,data=payload)
+                    return 'Success'
+            if '登录' in msg or '登陆' in msg:
+                if " " in msg:
+                    msg = msg.replace(" ","")
+                    id = msg[2:]
+                    认证.校验(id,userid)
+                    return "Success"
+                else :
+                    reply = {
+                        'reply':"回复 登录 你的学号"
+                    }
+                    return jsonify(reply)
+            try:
+                if msg == '预约':
+                    预约.appoint(userid)
+                    return 'Success'
+                if msg == '取消预约':
+                    预约.cancel(userid)
+                    return 'Success'
+                if '认证' in msg:
+                    if "," in msg or "，" in msg:
+                        msg = msg.replace("，",",")
+                        raw = msg.replace(" ","")[2:]
+                        verify = re.split(",",raw)
+                        id = verify[0]
+                        password = verify[1]
+                        code = verify[2]
+                        if 认证.登录(userid,id,password,code):
+                            reply = {
+                                'reply':"认证成功"
+                            }
+                            return jsonify(reply)
+                        else:
+                            reply = {
+                                'reply':"认证失败，请重试"
+                            }
+                            return jsonify(reply)
+                    认证.sendmsg(userid,"正在获取验证码...")
+                    url = "http://api.radiology.link:5700/send_private_msg"
+                    jpg = "https://api.radiology.link/Library/img/"+str(认证.验证码(userid))
+                    message = "验证码：[CQ:image,file=" + str(jpg) +"]\n请回复\n认证 教育在线学号,教育在线密码,验证码\n用逗号分隔,看不清请重新回复认证"
+                    payload = {"user_id":userid,"message":message}
+                    requests.post(url,data=payload)
+                    return 'Success'
+                if '抢座' in msg:
+                    if '确认' in msg:
+                        预约.appointnow(userid)
+                        return 'Success'
+                    reply = {
+                            'reply':"抢座执行后无法取消\n确定执行请回复\n抢座 确认"
+                        }
+                    return jsonify(reply)
+                if '绑定' in msg:
+                    msg = msg.replace(" ","")
+                    id = msg[2:]
+                    if id == "":
+                        id = 预约.check(userid)
+                        reply = {
+                            'reply':"请输入 绑定 你的学号\n现在已经绑定的学号是"+id
+                        }
+                        return jsonify(reply)
+                    try:
+                        if 认证.绑定(userid,id) :
+                            reply = {
+                                'reply':"学号绑定成功"
+                            }
+                            return jsonify(reply)
+                        else :
+                            reply = {
+                                'reply':"学号绑定失败"
+                            }
+                            return jsonify(reply)
+                    except:
+                        reply = {
+                            'reply':"请检查是否注册\n请前往 https://lab.radiology.link/signup.html 进行注册"
+                        }
+                        return jsonify(reply)
+            except:
                 reply = {
-                    'reply':"回复 登录 你的学号"
+                'reply':"请前往\nhttps://lab.radiology.link/signup.html 进行注册 或 \n回复 注册（试运行）"
                 }
                 return jsonify(reply)
-        try:
-            if msg == '预约':
-                预约.appoint(userid)
-                return 'Success'
-            if msg == '取消预约':
-                预约.cancel(userid)
-                return 'Success'
-            if '认证' in msg:
-                if "," in msg or "，" in msg:
-                    msg = msg.replace("，",",")
-                    raw = msg.replace(" ","")[2:]
-                    verify = re.split(",",raw)
-                    id = verify[0]
-                    password = verify[1]
-                    code = verify[2]
-                    if 认证.登录(userid,id,password,code):
-                        reply = {
-                            'reply':"认证成功"
-                        }
-                        return jsonify(reply)
-                    else:
-                        reply = {
-                            'reply':"认证失败，请重试"
-                        }
-                        return jsonify(reply)
-                认证.sendmsg(userid,"正在获取验证码...")
-                url = "http://api.radiology.link:5700/send_private_msg"
-                jpg = "https://api.radiology.link/Library/img/"+str(认证.验证码(userid))
-                message = "验证码：[CQ:image,file=" + str(jpg) +"]\n请回复 认证 教育在线学号,教育在线密码,验证码 用逗号分隔,看不清请重新回复认证"
-                payload = {"user_id":userid,"message":message}
-                requests.post(url,data=payload)
-                return 'Success'
-            if '抢座' in msg:
-                if '确认' in msg:
-                    预约.appointnow(userid)
-                    return 'Success'
-                reply = {
-                        'reply':"抢座执行后无法取消 确定执行请回复\n抢座 确认"
-                    }
-                return jsonify(reply)
-            if '绑定' in msg:
-                msg = msg.replace(" ","")
-                id = msg[2:]
-                if id == "":
-                    id = 预约.check(userid)
-                    reply = {
-                        'reply':"请输入 绑定 你的学号\n现在已经绑定的学号是"+id
-                    }
-                    return jsonify(reply)
-                try:
-                    if 认证.绑定(userid,id) :
-                        reply = {
-                            'reply':"学号绑定成功"
-                        }
-                        return jsonify(reply)
-                    else :
-                        reply = {
-                            'reply':"学号绑定失败"
-                        }
-                        return jsonify(reply)
-                except:
-                    reply = {
-                        'reply':"请检查是否注册\n请前往 https://lab.radiology.link/signup.html 进行注册"
-                    }
-                    return jsonify(reply)
-        except:
             reply = {
-            'reply':"请前往\nhttps://lab.radiology.link/signup.html 进行注册 或 \n回复 注册（试运行）"
+                'reply':"指定位置预约请前往 https://lab.radiology.link/ \n发送 预约 至机器人可快速预约\n发送 取消预约 可快速取消\n发送 抢座 可实时抢座\n发送 绑定 可绑定QQ \n发送 认证 进行学号绑定更换\n发送 人工 即可寻求人工帮助\n发送 邀请码 获得新人邀请码\n以上功能均需注册 请前往\nhttps://lab.radiology.link/signup.html 进行注册 或者发送 注册 （实验功能)\n以上功能均需要校验您是否能正常登录图书馆\n请务必回复 登录 ！谢谢"
             }
             return jsonify(reply)
+    except:
         reply = {
-            'reply':"指定位置预约请前往 https://lab.radiology.link/ \n发送 预约 至机器人可快速预约\n发送 取消预约 可快速取消\n发送 抢座 可实时抢座\n发送 绑定 可绑定QQ \n发送 认证 进行学号绑定更换\n发送 人工 即可接入开发者\n以上功能均需注册 请前往\nhttps://lab.radiology.link/signup.html 进行注册 或者发送 注册 （实验功能)\n以上功能均需要校验您是否能正常登录图书馆 请务必回复 登录 ！谢谢"
+            "reply":"触发错误机制，已经向管理员发送错误，请发送 人工 寻求帮助"
         }
         return jsonify(reply)
+
 
     if msgtype == 'request':
         userid = recv['user_id']

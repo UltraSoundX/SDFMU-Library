@@ -13,9 +13,29 @@ except:
     print('\033[33mWeb API:Down')
     print('\033[32m验证接口：Ready')
     print('\033[0m')
-    
+
+def 邀请码生成(位数):
+    total = string.digits +string.ascii_letters
+    key = ''
+    for i in range(1,位数+1):
+        key += random.choice(total) #获取随机字符或数字
+        if i % 4 == 0 and i !=位数: #每隔4个字符增加'-'
+            key += '-'
+    return key    
 
 class Verify:
+
+    def 邀请码(self,QQ):
+        游标 = 数据库.cursor()
+        查询邀请码 = "SELECT `invite` FROM `user` WHERE `qq`='%s'"%(QQ)
+        if 游标.execute(查询邀请码):
+            邀请码 = 游标.fetchone()[0]
+            msg = "您的邀请码是"+str(邀请码)
+            self.sendmsg(QQ,msg)
+            return 0
+        else :
+            self.sendmsg(QQ,'请绑定或注册后查询')
+            return 0
 
     def 校验(self,id,QQ):
         密码 = hashlib.md5()
@@ -40,8 +60,12 @@ class Verify:
         Cookie = requests.utils.dict_from_cookiejar(requests.get(url).cookies)
         return Cookie
     
-    def 注册(self,学号,密码,验证码,QQ):
+    def 注册(self,学号,密码,验证码,邀请码,QQ):
         游标 = 数据库.cursor()
+        查询邀请码 = "SELECT * FROM `invitecode` WHERE `invite` = '%s'" % (邀请码)
+        if 游标.execute(查询邀请码) == 0:
+            self.sendmsg(QQ,'找不到邀请码，可回复 人工 寻求帮助 或 找别人要邀请码')
+            return 0
         获取Cookie = "SELECT `cookie` FROM `verify` WHERE `verify`='%s'" % (QQ)
         游标.execute(获取Cookie)
         Cookie = 游标.fetchone()[0]
@@ -51,10 +75,17 @@ class Verify:
         url = "http://jwc.sdfmu.edu.cn/academic/j_acegi_security_check"
         请求 = requests.post(url,data=载荷,headers=header,cookies=Cookie)
         if 请求.url == 'http://jwc.sdfmu.edu.cn/academic/index_new.jsp':
-            注册 = "INSERT INTO `user`(`studentid`, `password`,`qq`) VALUES ('%s','%s','%s')" % (学号,学号,QQ)
-            print (注册)
+            新邀请码 =  邀请码生成(5)
+            注册 = "INSERT INTO `user`(`studentid`, `password`,`qq`,`invite`) VALUES ('%s','%s','%s','%s')" % (学号,学号,QQ,新邀请码)
             try:
                 if 游标.execute(注册):
+                    删除邀请码 = "DELETE FROM `invitecode` WHERE `invite` = '%s'" % (邀请码)
+                    增加新邀请码 = "INSERT INTO `invitecode`(`invite`) VALUES ('%s')" % (新邀请码)
+                    更改邀请状态 = "UPDATE `user` SET `invite`='%s' WHERE `invite`='%s'" % ('已邀请',邀请码)
+                    if 邀请码 != 'fighting':
+                        游标.execute(删除邀请码)
+                    游标.execute(更改邀请状态)
+                    游标.execute(增加新邀请码)
                     self.sendmsg(QQ,'注册成功\n网页端:https://lab.radiology.link\n默认登录密码为学号')
             except:
                 self.sendmsg(QQ,'发生了错误，是不是注册过了')
@@ -163,14 +194,14 @@ class Appoint :
             print (url)
             print (recv)
             if 'msg' in recv :
-                self.sendmsg(QQ,'预约失败，是否已有预约或者重试一次')
+                self.sendmsg(QQ,'预约失败\n是否已有预约或者重试一次')
             if len(recv) == 2 :
                 area = recv['area']
                 seat = recv['seat']
                 msg = '抢座成功，第'+str(area)+'书库，请在30分钟内到达图书馆签到'
                 self.sendmsg(QQ,msg)
         else :
-            self.sendmsg(QQ,'您是否绑定学号了？回复 绑定 查看绑定的学号')
+            self.sendmsg(QQ,'您是否绑定学号了？\n回复 绑定 查看绑定的学号')
     
     def appoint(self,QQ):
         游标 = 数据库.cursor()
