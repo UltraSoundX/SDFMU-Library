@@ -6,8 +6,11 @@ Demo:https://lab.radiology.link
 
 文件夹：
 WEB -- 包含前端JS
+
 API-对应sql数据处理以及coolq机器人对接
+
 Appoint - 对应计划任务执行预约
+
 CQHTTP - 用Flask处理CQHTTP消息上报
 
 新增：CQHTTP 消息上报处理
